@@ -1,0 +1,58 @@
+trigger:
+  branches:
+    include:
+      - develop
+  paths:
+    exclude:
+      - '.pipelines/*'
+      - 'README.md'
+      - '.gitignore'
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- task: UsePythonVersion@0
+  displayName: "Some shite"
+  inputs:
+    versionSpec: '3.8'
+    architecture: 'x64'
+
+- bash: |
+    if [ -f extensions.csproj]
+    then
+        dotnet build extensions.csproj -output ./bin
+      
+    fi
+    pip install --target="./.python_packages/lib/site-packages" wheel
+    pip install --target="./.python_packages/lib/site-packages" -r ./requirements.txt
+
+- task: ArchiveFiles@2
+  displayName: "Some Shite"
+  inputs:
+    rootFolderOrFile: "$(System.DefaultWorkingDirectory)"
+    includeRootFolder: false
+    archiveFile: "$(Build.ArtifactStaginDirectory)/$(Build.BuildId).zip"
+    artifactName: "drop"
+
+- task: PublishBuildArtifact@1
+  inputs:
+    PathToPublish: "$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip"
+
+- task: PowerShell@2
+  displayName: 'Debug parameters'
+  inputs:
+    targetType: Inline
+    script: |
+      Write-Host "$(Build.ArtifactStagingDirectory"
+      Write-Host "$(System.DefaultWorkingDirectory"
+      Write-Host "$(System.ArtifactsDirectory"
+      Write-Host "$(Pipeline.Workspace"
+      Write-Host "$(System.ArtifactsDirectory"
+
+- task: AzureFunctionApp@1
+  inputs:
+    azureSubscription: 'Azure Non-Production'
+    appType: functionAppLinux
+    appName: 'ads-functions-api-uks-dev'
+    package: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
